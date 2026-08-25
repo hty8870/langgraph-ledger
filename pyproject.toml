@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "langgraph-dsh-trace"
+version = "0.1.0"
+description = "DSH-grade traceability for LangGraph: hash-labeled tool calls, tamper-evident hash-chained event log, checkpoint DAG, and first-class fork/rollback."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["langgraph", "agent", "traceability", "audit", "hash-chain", "checkpoint", "rollback", "dsh"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Debuggers",
+    "Topic :: System :: Logging",
+]
+dependencies = [
+    "langgraph-checkpoint>=2.0",
+    "langchain-core>=0.3",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "langgraph>=0.2"]
+
+[project.urls]
+Homepage = "https://github.com/hty8870/langgraph-dsh-trace"
+Repository = "https://github.com/hty8870/langgraph-dsh-trace"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+langgraph_dsh_trace = ["py.typed"]
