@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Public API of langgraph-dsh-trace."""
+"""Public API of langgraph-ledger."""
 from __future__ import annotations
 
 from .analysis import analyze_log

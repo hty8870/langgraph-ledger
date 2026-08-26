@@ -3,13 +3,13 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "langgraph-dsh-trace"
+name = "langgraph-ledger"
 version = "0.2.0"
-description = "DSH-grade traceability for LangGraph: hash-labeled tool calls, tamper-evident hash-chained event log, checkpoint DAG, and first-class fork/rollback."
+description = "Full, tamper-evident traceability for LangGraph agents — a port of DeepSeek Harness (dsh)'s traceability design: hash-chained, content-addressed, replayable, rewindable."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-keywords = ["langgraph", "agent", "traceability", "audit", "hash-chain", "checkpoint", "rollback", "dsh"]
+keywords = ["langgraph", "agent", "traceability", "audit", "hash-chain", "checkpoint", "rollback", "replay", "dsh", "deepseek-harness", "ledger", "agent-observability"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -27,11 +27,14 @@ dependencies = [
 test = ["pytest>=8", "langgraph>=0.2"]
 
 [project.urls]
-Homepage = "https://github.com/hty8870/langgraph-dsh-trace"
-Repository = "https://github.com/hty8870/langgraph-dsh-trace"
+Homepage = "https://github.com/hty8870/langgraph-ledger"
+Repository = "https://github.com/hty8870/langgraph-ledger"
+
+[project.scripts]
+langgraph-ledger = "langgraph_ledger.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-langgraph_dsh_trace = ["py.typed"]
+langgraph_ledger = ["py.typed"]

@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """CLI: verify / analyze / dag / repair / replay a recorded trace log.
 
-    python -m langgraph_dsh_trace verify  <thread.jsonl>
-    python -m langgraph_dsh_trace analyze <thread.jsonl>
-    python -m langgraph_dsh_trace dag     <thread.jsonl> [--mermaid]
-    python -m langgraph_dsh_trace repair  <thread.jsonl | trace-root/>
-    python -m langgraph_dsh_trace replay  <thread.jsonl>
+    python -m langgraph_ledger verify  <thread.jsonl>
+    python -m langgraph_ledger analyze <thread.jsonl>
+    python -m langgraph_ledger dag     <thread.jsonl> [--mermaid]
+    python -m langgraph_ledger repair  <thread.jsonl | trace-root/>
+    python -m langgraph_ledger replay  <thread.jsonl>
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from .verify import verify_log
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="langgraph_dsh_trace",
+    parser = argparse.ArgumentParser(prog="langgraph_ledger",
                                      description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("verify", "analyze", "dag", "replay"):

@@ -4,9 +4,9 @@ import json
 
 import pytest
 
-from langgraph_dsh_trace.recorder import (TracePayloadError, TraceRecorder,
+from langgraph_ledger.recorder import (TracePayloadError, TraceRecorder,
                                           read_log)
-from langgraph_dsh_trace.verify import verify_log
+from langgraph_ledger.verify import verify_log
 
 
 def test_append_writes_hash_chained_envelopes(tmp_path):

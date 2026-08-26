@@ -9,12 +9,12 @@ from typing_extensions import TypedDict
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 
-from langgraph_dsh_trace import (DshTraceCallbackHandler, TracingCheckpointSaver,
+from langgraph_ledger import (DshTraceCallbackHandler, TracingCheckpointSaver,
                                  analyze_log, build_dag,
                                  find_checkpoint_by_label, fork_thread,
                                  read_log, recorder_for, time_travel_config,
                                  verify_log, verify_thread)
-from langgraph_dsh_trace import events as ev
+from langgraph_ledger import events as ev
 
 
 class State(TypedDict):

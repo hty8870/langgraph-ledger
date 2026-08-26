@@ -9,7 +9,7 @@ from typing_extensions import TypedDict
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 
-from langgraph_dsh_trace import (DshTraceCallbackHandler, TraceRecorder,
+from langgraph_ledger import (DshTraceCallbackHandler, TraceRecorder,
                                  TracingCheckpointSaver, analyze_log,
                                  build_dag, fork_thread, read_log,
                                  time_travel_config, verify_log, verify_thread)

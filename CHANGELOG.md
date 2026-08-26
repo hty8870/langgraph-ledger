@@ -5,18 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [0.2.0] - 2026-08-26
 
+> **Renamed**: the project was renamed from `langgraph-dsh-trace` to
+> **`langgraph-ledger`** before its first PyPI publication. The Python package
+> is now `langgraph_ledger`. The dsh lineage lives in the README design-mapping
+> table and keywords, not in the name.
+
 ### Added
 - **Run brackets**: the callback handler now opens `run/start` on the top-level
   graph invocation and closes it with `run/end` (status, step count, wall
   time) — the anchor for crash detection.
+- `python -m langgraph_ledger` entry point and a `langgraph-ledger` console
+  script (the documented CLI invocation previously lacked `__main__.py`).
 - **Crash recovery** (`repair.py`): `find_orphaned_runs` /
   `close_orphaned_run` / `repair_all` close crash-orphaned runs by appending an
   honest `run/end {status: "interrupted"}` through the hash chain. Idempotent;
-  history is never rewritten. CLI: `python -m langgraph_dsh_trace repair`.
+  history is never rewritten. CLI: `python -m langgraph_ledger repair`.
 - **Replay** (`replay.py`): `replay_messages` rebuilds the message timeline
   from a log (dsh `deriveMessages` analog) — digests by default, full text
   with `record_full=True`; unfinished tool calls surface as interrupted, never
-  silently dropped. CLI: `python -m langgraph_dsh_trace replay`.
+  silently dropped. CLI: `python -m langgraph_ledger replay`.
 - **Strict mode**: `TraceRecorder(..., strict=True)` flips tracing from
   fail-soft to fail-closed — a run that cannot record must not proceed
   (dsh's Model-Visible ⟺ Logged invariant, enforced).

@@ -1,6 +1,6 @@
-# langgraph-dsh-trace
+# langgraph-ledger
 
-**LangGraph 的 DSH 级可回溯性插件** —— 每个 tool call 的内容寻址哈希标签、防篡改的哈希链事件日志、执行 DAG，以及一等公民的 fork/回退。服务于操作的完整可回退、高度可审计与故障分析。
+**面向 LangGraph agent 的全量、防篡改可回溯性** —— 移植 DeepSeek Harness（dsh）的可回溯性设计：每个 tool call 的内容寻址哈希标签、仅追加的哈希链事件账本、执行 DAG、崩溃恢复与回放，以及一等公民的 fork/回退。服务于操作的完整可回退、高度可审计与故障分析。
 
 [English](README.md) · [中文](README.zh.md)
 
@@ -25,7 +25,7 @@ LangGraph 自带 checkpoint 和时间旅行，但它不给你的的是一份**�
 
 | 项目 | 哈希链 | 执行 DAG | 状态回退/分叉 | LangGraph 原生 |
 |---|---|---|---|---|
-| **langgraph-dsh-trace** | ✅ | ✅ | ✅ | ✅（checkpointer 即插即用） |
+| **langgraph-ledger** | ✅ | ✅ | ✅ | ✅（checkpointer 即插即用） |
 | LangSmith / Langfuse / AgentOps | ✗（托管观测） | trace 视图 | ✗ | SDK |
 | CONTINUUM | ✅ | ✗ | 聚焦崩溃恢复 | ✗（MCP server） |
 | burnout / VeritasAgent / memtrail | ✅ | ✗ | ✗ | 部分 |
@@ -36,14 +36,14 @@ LangGraph 自带 checkpoint 和时间旅行，但它不给你的的是一份**�
 ## 安装
 
 ```bash
-pip install langgraph-dsh-trace
+pip install langgraph-ledger
 ```
 
 ## 快速上手
 
 ```python
 from langgraph.checkpoint.memory import InMemorySaver
-from langgraph_dsh_trace import TracingCheckpointSaver, DshTraceCallbackHandler
+from langgraph_ledger import TracingCheckpointSaver, DshTraceCallbackHandler
 
 saver = TracingCheckpointSaver(InMemorySaver(), trace_root="./traces")
 graph = builder.compile(checkpointer=saver)          # 你的图，不用改
@@ -64,7 +64,7 @@ graph.invoke(input, config={
 ### 回退与分叉
 
 ```python
-from langgraph_dsh_trace import time_travel_config, fork_thread
+from langgraph_ledger import time_travel_config, fork_thread
 
 # 从任意已记录 checkpoint 恢复/分叉（LangGraph 原生时间旅行）
 cfg = time_travel_config("run-42", checkpoint_id="<past-id>")
@@ -77,15 +77,15 @@ new_tid = fork_thread(saver, "run-42", at_checkpoint_id="<past-id>")
 ### 审计
 
 ```bash
-python -m langgraph_dsh_trace verify  traces/run-42.jsonl   # 哈希链完好？
-python -m langgraph_dsh_trace analyze traces/run-42.jsonl   # 错误、循环、时间线
-python -m langgraph_dsh_trace dag     traces/run-42.jsonl --mermaid
-python -m langgraph_dsh_trace repair  traces/               # 闭合崩溃遗留的未完结 run
-python -m langgraph_dsh_trace replay  traces/run-42.jsonl   # 从日志重建消息时间线
+python -m langgraph_ledger verify  traces/run-42.jsonl   # 哈希链完好？
+python -m langgraph_ledger analyze traces/run-42.jsonl   # 错误、循环、时间线
+python -m langgraph_ledger dag     traces/run-42.jsonl --mermaid
+python -m langgraph_ledger repair  traces/               # 闭合崩溃遗留的未完结 run
+python -m langgraph_ledger replay  traces/run-42.jsonl   # 从日志重建消息时间线
 ```
 
 ```python
-from langgraph_dsh_trace import verify_thread
+from langgraph_ledger import verify_thread
 report = verify_thread(saver, "traces/run-42.jsonl")  # 存储态 == 日志声明？
 assert report["ok"]
 ```

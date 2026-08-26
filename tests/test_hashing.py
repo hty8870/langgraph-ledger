@@ -2,7 +2,7 @@
 """Hashing primitives: canonicalization, labels, hash chain."""
 import pytest
 
-from langgraph_dsh_trace.hashing import (GENESIS_PREV, canonical_json,
+from langgraph_ledger.hashing import (GENESIS_PREV, canonical_json,
                                          checkpoint_label, event_id,
                                          sha256_hex, tool_call_label)
 

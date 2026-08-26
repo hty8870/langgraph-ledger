@@ -11,7 +11,7 @@ them into dsh-style operations:
   the parent lineage (dsh SessionHeader's parentSession + seedLength).
 
 Because every checkpoint carries a content hash, a fork can be verified after
-the fact with :func:`langgraph_dsh_trace.verify.verify_thread`.
+the fact with :func:`langgraph_ledger.verify.verify_thread`.
 """
 from __future__ import annotations
 

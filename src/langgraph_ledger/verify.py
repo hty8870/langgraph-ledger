@@ -46,7 +46,7 @@ def verify_log(path: str | Path) -> VerifyReport:
 
     Checks: hash chain (seq/prev/id), format version, and run bracket pairing
     (an unclosed ``run/start`` means the process died mid-run — the log is
-    honest but incomplete; repair it with :mod:`langgraph_dsh_trace.repair`).
+    honest but incomplete; repair it with :mod:`langgraph_ledger.repair`).
     """
     errors: list[dict[str, Any]] = []
     events = 0

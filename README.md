@@ -1,6 +1,6 @@
-# langgraph-dsh-trace
+# langgraph-ledger
 
-**DSH-grade traceability for LangGraph** — content-addressed labels on every tool call, a tamper-evident hash-chained event log, the execution DAG, and first-class fork/rollback. For full rollback, high auditability, and failure analysis of agent runs.
+**Full, tamper-evident traceability for LangGraph agents** — a port of DeepSeek Harness (dsh)'s traceability design: content-addressed labels on every tool call, a hash-chained append-only event ledger, the execution DAG, replay, crash recovery, and first-class fork/rollback.
 
 [English](README.md) · [中文](README.zh.md)
 
@@ -27,7 +27,7 @@ Honest snapshot of the neighborhood — see [POSITIONING](docs/positioning.md) f
 
 | Project | Hash chain | Execution DAG | State rollback/fork | LangGraph-native |
 |---|---|---|---|---|
-| **langgraph-dsh-trace** | ✅ | ✅ | ✅ | ✅ (checkpointer drop-in) |
+| **langgraph-ledger** | ✅ | ✅ | ✅ | ✅ (checkpointer drop-in) |
 | LangSmith / Langfuse / AgentOps | ✗ (hosted observability) | trace view | ✗ | SDK |
 | CONTINUUM | ✅ | ✗ | crash recovery focus | ✗ (MCP server) |
 | burnout / VeritasAgent / memtrail | ✅ | ✗ | ✗ | partial |
@@ -38,14 +38,14 @@ Nobody else ships hash-labels + DAG + rollback as one LangGraph-native unit. Tha
 ## Install
 
 ```bash
-pip install langgraph-dsh-trace
+pip install langgraph-ledger
 ```
 
 ## Quickstart
 
 ```python
 from langgraph.checkpoint.memory import InMemorySaver
-from langgraph_dsh_trace import TracingCheckpointSaver, DshTraceCallbackHandler
+from langgraph_ledger import TracingCheckpointSaver, DshTraceCallbackHandler
 
 saver = TracingCheckpointSaver(InMemorySaver(), trace_root="./traces")
 graph = builder.compile(checkpointer=saver)          # your graph, unchanged
@@ -66,7 +66,7 @@ Every run now leaves `./traces/run-42.jsonl` — one hash-chained JSON event per
 ### Rollback & fork
 
 ```python
-from langgraph_dsh_trace import time_travel_config, fork_thread
+from langgraph_ledger import time_travel_config, fork_thread
 
 # resume/fork from any recorded checkpoint (LangGraph-native time travel)
 cfg = time_travel_config("run-42", checkpoint_id="<past-id>")
@@ -79,15 +79,15 @@ new_tid = fork_thread(saver, "run-42", at_checkpoint_id="<past-id>")
 ### Audit
 
 ```bash
-python -m langgraph_dsh_trace verify  traces/run-42.jsonl   # hash chain intact?
-python -m langgraph_dsh_trace analyze traces/run-42.jsonl   # errors, loops, timeline
-python -m langgraph_dsh_trace dag     traces/run-42.jsonl --mermaid
-python -m langgraph_dsh_trace repair  traces/               # close crash-orphaned runs
-python -m langgraph_dsh_trace replay  traces/run-42.jsonl   # rebuild the message timeline
+python -m langgraph_ledger verify  traces/run-42.jsonl   # hash chain intact?
+python -m langgraph_ledger analyze traces/run-42.jsonl   # errors, loops, timeline
+python -m langgraph_ledger dag     traces/run-42.jsonl --mermaid
+python -m langgraph_ledger repair  traces/               # close crash-orphaned runs
+python -m langgraph_ledger replay  traces/run-42.jsonl   # rebuild the message timeline
 ```
 
 ```python
-from langgraph_dsh_trace import verify_thread
+from langgraph_ledger import verify_thread
 report = verify_thread(saver, "traces/run-42.jsonl")  # stored state == logged claim?
 assert report["ok"]
 ```

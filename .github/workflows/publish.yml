@@ -23,7 +23,7 @@ jobs:
       - name: Smoke-test the built wheel
         run: |
           python -m pip install dist/*.whl
-          python -c "import langgraph_dsh_trace as t; assert t.__version__"
+          python -c "import langgraph_ledger as t; assert t.__version__"
       - uses: actions/upload-artifact@v4
         with:
           name: dist

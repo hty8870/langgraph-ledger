@@ -1,4 +1,4 @@
-# Positioning — langgraph-dsh-trace vs. the neighborhood
+# Positioning — langgraph-ledger vs. the neighborhood
 
 Survey date: 2026-08-26 (GitHub search; stars move fast, re-check before quoting).
 
@@ -17,7 +17,7 @@ each other:
    hash-chained receipts. But they are not LangGraph checkpointers: no
    execution DAG over real checkpoints, no fork-from-any-node rollback.
 
-**langgraph-dsh-trace = 1 ∩ 2 ∩ 3**, as a drop-in `BaseCheckpointSaver`
+**langgraph-ledger = 1 ∩ 2 ∩ 3**, as a drop-in `BaseCheckpointSaver`
 wrapper plus a callback handler. The design discipline (append-only source of
 truth, format versioning, fork lineage, fail-closed invariants) is ported from
 DeepSeek Harness; the content-addressed labeling (`tl_*` / `cp_*`) and the

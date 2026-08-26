@@ -6,7 +6,7 @@ Because every tool call carries a content-addressed label, exact-repeat loops
 for free. Combined with error events and node timings this gives a compact
 first-stop failure report:
 
-    python -m langgraph_dsh_trace analyze <log.jsonl>
+    python -m langgraph_ledger analyze <log.jsonl>
 """
 from __future__ import annotations
 

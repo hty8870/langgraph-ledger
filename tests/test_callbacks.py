@@ -2,10 +2,10 @@
 """Callback handler: tool-call hash labels, error capture, loop detection."""
 from langchain_core.tools import tool
 
-from langgraph_dsh_trace import (DshTraceCallbackHandler, TraceRecorder,
+from langgraph_ledger import (DshTraceCallbackHandler, TraceRecorder,
                                  analyze_log, read_log, verify_log)
-from langgraph_dsh_trace import events as ev
-from langgraph_dsh_trace.hashing import tool_call_label
+from langgraph_ledger import events as ev
+from langgraph_ledger.hashing import tool_call_label
 
 
 @tool

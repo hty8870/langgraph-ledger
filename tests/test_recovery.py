@@ -11,12 +11,12 @@ from typing_extensions import TypedDict
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 
-from langgraph_dsh_trace import (DshTraceCallbackHandler, TracePayloadError,
+from langgraph_ledger import (DshTraceCallbackHandler, TracePayloadError,
                                  TraceRecorder, TracingCheckpointSaver,
                                  analyze_log, close_orphaned_run,
                                  find_orphaned_runs, read_log, recorder_for,
                                  repair_all, replay_messages, verify_log)
-from langgraph_dsh_trace import events as ev
+from langgraph_ledger import events as ev
 
 
 # -- strict mode ---------------------------------------------------------------

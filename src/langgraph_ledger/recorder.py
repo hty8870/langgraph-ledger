@@ -52,7 +52,7 @@ _WARNED: set[str] = set()
 def _warn_once(key: str, message: str) -> None:
     if key not in _WARNED:
         _WARNED.add(key)
-        print(f"[langgraph_dsh_trace] {message}", file=sys.stderr)
+        print(f"[langgraph_ledger] {message}", file=sys.stderr)
 
 
 def _safe_segment(value: Any) -> str:
@@ -187,7 +187,7 @@ def read_log(path: str | Path) -> Iterator[dict[str, Any]]:
 # ---- contextvars propagation (zero-signature-change integration) -------------
 
 _CURRENT: contextvars.ContextVar["TraceRecorder | None"] = contextvars.ContextVar(
-    "langgraph_dsh_trace_recorder", default=None)
+    "langgraph_ledger_recorder", default=None)
 
 
 def current_recorder() -> "TraceRecorder | None":
