@@ -109,7 +109,9 @@ If the process dies mid-run, the log ends with an unclosed `run/start`.
 rewrites history). `replay_messages()` rebuilds the conversation timeline from
 the log — digests by default, full text when the handler was created with
 `record_full=True`. For fail-closed operation (a run that cannot record must
-not proceed), use `TraceRecorder(..., strict=True)`.
+not proceed), use `TraceRecorder(..., strict=True)` — enforced at the recorder
+and the checkpointer. Caveat: LangChain's callback manager may swallow handler
+exceptions, so for hard guarantees prefer the checkpointer path.
 
 ## Design mapping from DeepSeek Harness
 
@@ -138,6 +140,26 @@ Before extraction, this design was battle-tested inside a production LangGraph a
 - **Snapshot/rollback drill passed end-to-end**: file-level preimages, fail-closed on missing preimage (refuses rather than destroys), idempotent re-application.
 - **3,150-test suite green** after wiring the full hook surface.
 - The trace layer was how failures were *audited*: one reviewed failure class went from **17/17 of cases to 0** after the trace made its mechanism visible; routing dead-ends went **2 → 0**. (The latency cost of that refactor came from extra model rounds, not from tracing — the ledger itself stayed under 0.1%.)
+
+## Threat model (read before you rely on "tamper-evident")
+
+The hash chain is **keyless** — this is a design choice, and it has a precise meaning:
+
+- ✅ **Proven**: given a trusted chain head, ANY deletion, reordering, or edit of ANY logged line is detectable (`verify` recomputes the full chain).
+- ❌ **Not proven**: an attacker with write access to the log file who rewrites the *entire* file and re-chains it from genesis. No secret is involved, so nothing stops a full rewrite.
+
+**Therefore: anchor the head outside the log's trust domain.** Export it after each run and store it somewhere the process cannot write:
+
+```bash
+python -m langgraph_ledger head traces/run-42.jsonl   # {"seq": N, "id": "<hex>"}
+```
+
+Later, `verify` + a head comparison gives you end-to-end integrity. A daily cron appending heads to an append-only store (or an email to yourself) is enough.
+
+Two more honest limits:
+
+- **One writer process per log.** The append lock is in-process (`threading.Lock`); two processes appending to the same `<thread>.jsonl` will fork the chain. Use one trace root per process, or serialize externally.
+- **`verify_thread` needs the live saver.** Checkpoint drift detection re-reads the saver, so it works across restarts only with a persistent backend (SQLite/Postgres). The log itself (`verify_log`) verifies anywhere.
 
 ## What it is NOT
 

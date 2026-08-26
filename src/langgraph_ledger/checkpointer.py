@@ -88,6 +88,15 @@ class TracingCheckpointSaver(BaseCheckpointSaver):
             return None
         return self.recorder_for(thread_id)
 
+    def _raise_if_strict(self, thread_id: str) -> None:
+        """strict recorders must stay fail-closed even behind our fail-soft
+        wrapper — a run that cannot record must not proceed."""
+        rec = self._default_recorder or current_recorder()
+        if rec is None and self.enabled:
+            rec = recorder_for(self.trace_root, thread_id, enabled=self.enabled)
+        if rec is not None and rec.strict:
+            raise
+
     # -- checkpoint hashing ---------------------------------------------------------
 
     def _checkpoint_digest(self, checkpoint: Checkpoint) -> tuple[str, str]:
@@ -121,14 +130,15 @@ class TracingCheckpointSaver(BaseCheckpointSaver):
         out = self.inner.put(config, checkpoint, metadata, new_versions)
         try:
             self._emit_snapshot(out, metadata)
-        except Exception:  # noqa: BLE001 — observation never breaks the run
-            pass
+        except Exception:  # noqa: BLE001 — observation never breaks the run…
+            tid, _ns, _p = _cfg_ids(out)
+            self._raise_if_strict(tid)   # …unless the recorder is strict
         return out
 
     def _trace_writes(self, config: RunnableConfig, writes: Sequence[tuple[str, Any]],
                       task_id: str) -> None:
+        thread_id, _ns, checkpoint_id = _cfg_ids(config)
         try:
-            thread_id, _ns, checkpoint_id = _cfg_ids(config)
             rec = self._rec_for(thread_id)
             if rec is not None:
                 digested = []
@@ -146,7 +156,7 @@ class TracingCheckpointSaver(BaseCheckpointSaver):
                     checkpoint_id=str(checkpoint_id) if checkpoint_id else None,
                     task_id=task_id, writes=digested))
         except Exception:  # noqa: BLE001
-            pass
+            self._raise_if_strict(thread_id)
 
     def put_writes(self, config: RunnableConfig, writes: Sequence[tuple[str, Any]],
                    task_id: str, task_path: str = "") -> None:
@@ -180,10 +190,10 @@ class TracingCheckpointSaver(BaseCheckpointSaver):
     async def aput(self, config: RunnableConfig, checkpoint: Checkpoint,
                    metadata: CheckpointMetadata, new_versions: Any) -> RunnableConfig:
         out = await self.inner.aput(config, checkpoint, metadata, new_versions)
+        thread_id, _ns, _p = _cfg_ids(out)
         try:
             tup = await self.inner.aget_tuple(out)
             if tup is not None:
-                thread_id, _ns, _p = _cfg_ids(out)
                 rec = self._rec_for(thread_id)
                 if rec is not None:
                     full, label = self._checkpoint_digest(tup.checkpoint)
@@ -196,7 +206,7 @@ class TracingCheckpointSaver(BaseCheckpointSaver):
                         parent_checkpoint_id=str(parent_id) if parent_id else None,
                         step=md.get("step"), source=str(md.get("source") or "")))
         except Exception:  # noqa: BLE001
-            pass
+            self._raise_if_strict(thread_id)
         return out
 
     async def aput_writes(self, config: RunnableConfig, writes: Sequence[tuple[str, Any]],

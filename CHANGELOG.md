@@ -3,6 +3,32 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1] - 2026-08-26
+
+Hardening release driven by an adversarial self-review.
+
+### Fixed
+- **Crash resume no longer glues a new chain onto a corrupt log.** A torn tail
+  (half-written last line after a crash) is truncated to the longest valid
+  prefix and the chain resumes; a log with zero valid events is quarantined to
+  `*.corrupt-<ts>.jsonl` instead of receiving a second genesis. Mid-file
+  corruption still fails loudly — tolerance is tail-only.
+- **`strict=True` now actually fails closed through the checkpointer** —
+  tracing exceptions are re-raised instead of swallowed when the recorder is
+  strict. (Callback path caveat documented: LangChain's callback manager may
+  swallow handler exceptions.)
+- dag module docstring promised `fork` edges that were never emitted; corrected
+  (forks render as nodes, the cross-log edge is documented as out of scope).
+
+### Added
+- **Threat model section** in both READMEs: what a keyless hash chain proves
+  (any edit detectable *given a trusted head*) and what it cannot prove
+  (whole-file rewrite) — plus `chain_head()` and `langgraph-ledger head` CLI
+  to export the head for external anchoring.
+- **`head_chars` knob** (handler + payload builders): the digest's plaintext
+  head preview is now configurable; `head_chars=0` gives a pure digest.
+- CI now also tests on Python 3.10 (the declared minimum).
+
 ## [0.2.0] - 2026-08-26
 
 > **Renamed**: the project was renamed from `langgraph-dsh-trace` to

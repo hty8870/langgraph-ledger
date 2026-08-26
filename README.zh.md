@@ -105,7 +105,9 @@ assert report["ok"]
 *open run*；`repair` 通过哈希链追加一条诚实的 `run/end {status: "interrupted"}`
 （幂等、不改写历史）。`replay_messages()` 从日志重建对话时间线——默认只给
 digest，handler 以 `record_full=True` 创建时给全文。若需要 fail-closed（记录
-不下来就不允许 run 继续），用 `TraceRecorder(..., strict=True)`。
+不下来就不允许 run 继续），用 `TraceRecorder(..., strict=True)`——在 recorder 和
+checkpointer 两处强制执行。注意：LangChain 的 callback manager 可能吞掉 handler
+异常，要硬保证请走 checkpointer 通道。
 
 ## 与 DeepSeek Harness 的设计映射
 
@@ -134,6 +136,26 @@ digest，handler 以 `record_full=True` 创建时给全文。若需要 fail-clos
 - **快照/回退端到端演练通过**：文件级 preimage、无 preimage 时 fail-closed 拒动（宁少退不毁数据）、重复执行幂等。
 - 接线完成后**全量 3,150 条测试全绿**。
 - 这套 trace 正是故障**复盘**的工具：一类曾占复盘样本 **17/17** 的失败模式，在 trace 让机制现形后降为 **0**；误判路由死胡同 **2 → 0**。（那轮重构的延迟代价来自更多模型轮次，不是 tracing——账本自身开销始终在 0.1% 以下。）
+
+## 威胁模型（依赖"防篡改"之前必读）
+
+哈希链是**无密钥**的——这是设计选择，含义很精确：
+
+- ✅ **能证明**：给定一个可信链头，对任何一行的删除、乱序、篡改都能被检出（`verify` 重算整条链）。
+- ❌ **不能证明**：对日志文件有写权限的攻击者把**整个文件**重写并重新接链。没有秘密参与，就无法阻止整体重写。
+
+**所以：把链头锚定到日志信任域之外。** 每次 run 后导出链头，存到进程写不到的地方：
+
+```bash
+python -m langgraph_ledger head traces/run-42.jsonl   # {"seq": N, "id": "<hex>"}
+```
+
+之后 `verify` + 链头比对即得端到端完整性。一个每天把链头追加到仅追加存储（或发邮件给自己）的 cron 就够了。
+
+另外两条如实边界：
+
+- **单进程单写者**：追加锁是进程内的（`threading.Lock`）；两个进程写同一个 `<thread>.jsonl` 会把链写劈叉。多进程请各用各的 trace root。
+- **`verify_thread` 需要活着的 saver**：checkpoint 漂移检测要重读 saver，跨进程重启验证需配持久化后端（SQLite/Postgres）。日志本身（`verify_log`）在哪都能验。
 
 ## 它不是什么
 

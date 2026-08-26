@@ -6,8 +6,10 @@ Node = one event. Edges:
 - ``call``    — tool/call → its tool/result (paired by label/run id);
 - ``writes``  — state/snapshot → the checkpoint/writes that followed it;
 - ``parent``  — state/snapshot → its parent snapshot (the checkpoint DAG edge
-  LangGraph gives us via the config's checkpoint_id);
-- ``fork``    — fork event → the child thread it seeded (cross-log lineage).
+  LangGraph gives us via the config's checkpoint_id).
+
+Fork events appear as nodes (their payload carries the child thread id); the
+edge to the child thread is cross-log and therefore not drawn here.
 
 When several edge kinds would connect the same pair, the most *semantic* one
 wins (parent > call > writes > chain): the timeline is already readable from
@@ -26,7 +28,7 @@ from .recorder import read_log
 __all__ = ["RunDAG", "build_dag", "build_dag_from_file"]
 
 #: edge-kind priority when several kinds hit the same (from, to) pair
-_PRIORITY = {"parent": 4, "call": 3, "writes": 2, "fork": 2, "chain": 1}
+_PRIORITY = {"parent": 4, "call": 3, "writes": 2, "chain": 1}
 
 
 class RunDAG:
@@ -69,7 +71,7 @@ class RunDAG:
             if n["error"]:
                 lines.append(f"  class n{seq} err")
         style = {"chain": "-->", "call": "-.->", "writes": "-.->",
-                 "parent": "==>", "fork": "==>"}
+                 "parent": "==>"}
         for e in self.edges:
             arrow = style.get(e["kind"], "-->")
             lines.append(f"  n{e['from']} {arrow} n{e['to']}")

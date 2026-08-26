@@ -31,7 +31,25 @@ def _checkpoint_sha(serde, checkpoint) -> str:
         blob2 = blob2.encode("utf-8")
     return sha256_hex(tag2.encode() + b"\x00" + blob2)
 
-__all__ = ["verify_log", "verify_thread", "VerifyReport"]
+__all__ = ["verify_log", "verify_thread", "VerifyReport", "chain_head"]
+
+
+def chain_head(path: str | Path) -> dict[str, Any]:
+    """The current head of a log's hash chain: ``{"seq": N, "id": "<hex>"}``.
+
+    Anchor THIS value somewhere outside the log's trust domain (another
+    machine, an email, a timestamping service). The chain proves integrity
+    *relative to a trusted head*: given the head, any deletion, reorder or
+    edit of any line is detectable. Without an anchored head, an attacker who
+    can rewrite the whole file can simply re-chain it — see the threat model
+    in the README.
+    """
+    last: dict[str, Any] | None = None
+    for e in read_log(path):
+        last = e
+    if last is None:
+        return {"seq": -1, "id": GENESIS_PREV}
+    return {"seq": last.get("seq"), "id": last.get("id")}
 
 
 class VerifyReport(dict):

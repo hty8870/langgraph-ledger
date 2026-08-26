@@ -45,7 +45,12 @@ def canonical_json(value: Any) -> str:
 
 
 def _fallback(value: Any) -> Any:
-    """Last-resort rendering for non-JSON-native objects (repr, marked)."""
+    """Last-resort rendering for non-JSON-native objects (repr, marked).
+
+    Note: ``repr`` may embed memory addresses, so labels over non-serializable
+    inputs are not guaranteed stable across processes — the callback handler
+    mitigates this by falling back to the plain input string for such calls.
+    """
     return {"__repr__": repr(value)}
 
 

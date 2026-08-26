@@ -63,15 +63,19 @@ EVENT_KINDS: frozenset[str] = frozenset({
 })
 
 
-def digest_text(text: Any) -> dict[str, Any]:
-    """Content digest without the content: sha256 + char count + 80-char head.
+def digest_text(text: Any, *, head_chars: int = 80) -> dict[str, Any]:
+    """Content digest without the content: sha256 + char count + short head.
 
     Answers "what was this call about" for audit without persisting full
     prompts/responses (size + sensitivity). Full text is opt-in at the call
     site, never default.
+
+    Note: the ``head`` preview IS plaintext — the first ``head_chars`` may
+    contain sensitive content. Pass ``head_chars=0`` for a pure digest.
     """
     s = str(text if text is not None else "")
-    return {"sha256": sha256_hex(s), "chars": len(s), "head": s[:80]}
+    head_chars = max(0, int(head_chars))
+    return {"sha256": sha256_hex(s), "chars": len(s), "head": s[:head_chars]}
 
 
 def run_start_payload(*, graph: str = "", thread_id: str = "",
@@ -82,7 +86,7 @@ def run_start_payload(*, graph: str = "", thread_id: str = "",
 
 def run_end_payload(*, status: str, error: str = "", steps: int = 0,
                     ms: int = 0) -> dict[str, Any]:
-    """status: completed | error | aborted (dsh turn/end reason, simplified)."""
+    """status: completed | error | interrupted (dsh turn/end reason, simplified)."""
     return {"status": str(status or ""), "error": str(error or ""),
             "steps": int(steps or 0), "ms": int(ms or 0)}
 
@@ -95,9 +99,11 @@ def node_boundary_payload(*, node: str, run_id: str = "",
 
 def llm_call_payload(*, node: str, model: str, prompt: Any, response: Any,
                      ms: int, usage: dict | None = None,
-                     error: str = "", record_full: bool = False) -> dict[str, Any]:
+                     error: str = "", record_full: bool = False,
+                     head_chars: int = 80) -> dict[str, Any]:
     payload = {"node": str(node or ""), "model": str(model or ""),
-               "prompt": digest_text(prompt), "response": digest_text(response),
+               "prompt": digest_text(prompt, head_chars=head_chars),
+               "response": digest_text(response, head_chars=head_chars),
                "ms": int(ms or 0), "usage": usage, "error": str(error or "")}
     if record_full:
         payload["prompt_text"] = str(prompt if prompt is not None else "")
@@ -107,11 +113,13 @@ def llm_call_payload(*, node: str, model: str, prompt: Any, response: Any,
 
 def tool_call_payload(*, label: str, node: str, name: str, tool_input: Any,
                       run_id: str = "", parent_run_id: str = "",
-                      record_full: bool = False) -> dict[str, Any]:
+                      record_full: bool = False,
+                      head_chars: int = 80) -> dict[str, Any]:
     """One tool invocation. `label` is the content-addressed identity from
     hashing.tool_call_label — identical (name, input) pairs share a label."""
     payload = {"label": str(label or ""), "node": str(node or ""),
-               "name": str(name or ""), "input_digest": digest_text(tool_input),
+               "name": str(name or ""),
+               "input_digest": digest_text(tool_input, head_chars=head_chars),
                "run_id": str(run_id or ""), "parent_run_id": str(parent_run_id or "")}
     if record_full:
         payload["input"] = tool_input
@@ -120,10 +128,12 @@ def tool_call_payload(*, label: str, node: str, name: str, tool_input: Any,
 
 def tool_result_payload(*, label: str, name: str, ok: bool, ms: int = 0,
                         output: Any = None, error: str = "",
-                        run_id: str = "", record_full: bool = False) -> dict[str, Any]:
+                        run_id: str = "", record_full: bool = False,
+                        head_chars: int = 80) -> dict[str, Any]:
     payload = {"label": str(label or ""), "name": str(name or ""), "ok": bool(ok),
                "ms": int(ms or 0),
-               "output_digest": digest_text(output) if output is not None else None,
+               "output_digest": (digest_text(output, head_chars=head_chars)
+                                 if output is not None else None),
                "error": str(error or ""), "run_id": str(run_id or "")}
     if record_full and output is not None:
         payload["output"] = output if isinstance(output, (dict, list)) else str(output)

@@ -35,12 +35,15 @@ __all__ = ["DshTraceCallbackHandler"]
 class DshTraceCallbackHandler(BaseCallbackHandler):
     """Emit dsh-style trace events for node / LLM / tool activity."""
 
-    def __init__(self, recorder: Any = None, *, record_full: bool = False) -> None:
+    def __init__(self, recorder: Any = None, *, record_full: bool = False,
+                 head_chars: int = 80) -> None:
         super().__init__()
         #: Optional explicit recorder; falls back to the context-bound one.
         self.recorder = recorder
         #: Opt-in: persist full text next to digests (replay prerequisite).
         self.record_full = bool(record_full)
+        #: Plaintext preview length in digests; 0 = pure digest (no leak).
+        self.head_chars = int(head_chars)
         self._starts: dict[str, float] = {}
         self._llm_open: dict[str, dict[str, Any]] = {}
         #: run_id -> {label, name, node} so the result can echo the call's label
@@ -175,7 +178,7 @@ class DshTraceCallbackHandler(BaseCallbackHandler):
         self._emit(ev.KIND_LLM_CALL, ev.llm_call_payload(
             node=info.get("node", ""), model=info.get("model", ""),
             prompt=info.get("text", ""), response=text, ms=ms, usage=usage,
-            record_full=self.record_full))
+            record_full=self.record_full, head_chars=self.head_chars))
 
     def on_llm_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
         ms = self._ms_since(run_id)
@@ -184,7 +187,7 @@ class DshTraceCallbackHandler(BaseCallbackHandler):
             node=info.get("node", ""), model=info.get("model", ""),
             prompt=info.get("text", ""), response="", ms=ms,
             error=f"{type(error).__name__}: {error}",
-            record_full=self.record_full))
+            record_full=self.record_full, head_chars=self.head_chars))
 
     # -- tool calls (hash-labeled; result echoes the call's label) -----------------
 
@@ -202,7 +205,7 @@ class DshTraceCallbackHandler(BaseCallbackHandler):
             label=label, node=self._node(metadata), name=name,
             tool_input=canonical_input, run_id=str(run_id),
             parent_run_id=str(parent_run_id) if parent_run_id else "",
-            record_full=self.record_full))
+            record_full=self.record_full, head_chars=self.head_chars))
 
     def on_tool_end(self, output: Any, *, run_id: UUID, **kwargs: Any) -> None:
         ms = self._ms_since(run_id)
@@ -210,7 +213,7 @@ class DshTraceCallbackHandler(BaseCallbackHandler):
         self._emit(ev.KIND_TOOL_RESULT, ev.tool_result_payload(
             label=opened.get("label", ""), name=opened.get("name", ""),
             ok=True, ms=ms, output=output, run_id=str(run_id),
-            record_full=self.record_full))
+            record_full=self.record_full, head_chars=self.head_chars))
 
     def on_tool_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
         ms = self._ms_since(run_id)
@@ -218,4 +221,4 @@ class DshTraceCallbackHandler(BaseCallbackHandler):
         self._emit(ev.KIND_TOOL_RESULT, ev.tool_result_payload(
             label=opened.get("label", ""), name=opened.get("name", ""),
             ok=False, ms=ms, error=f"{type(error).__name__}: {error}",
-            run_id=str(run_id), record_full=self.record_full))
+            run_id=str(run_id), record_full=self.record_full, head_chars=self.head_chars))

@@ -125,14 +125,51 @@ class TraceRecorder:
         self._next_seq = 0
         self._prev = GENESIS_PREV
         if self.enabled and self.path.exists():
-            try:
-                for line in read_log(self.path):
-                    self._next_seq = line["seq"] + 1
-                    self._prev = line["id"]
-            except (OSError, KeyError, json.JSONDecodeError) as exc:
-                _warn_once(f"resume::{type(exc).__name__}",
-                           f"existing log unreadable ({type(exc).__name__}); "
-                           "starting a fresh chain — investigate manually.")
+            self._resume()
+
+    def _resume(self) -> None:
+        """Resume seq/chain from the existing log, dsh torn-tail style.
+
+        A crash can leave a half-written last line. We keep the longest valid
+        prefix and truncate the torn tail (counted, warned). If not a single
+        line parses, the file is quarantined (renamed ``*.corrupt-<ts>.jsonl``)
+        and a fresh chain starts in a clean file — we NEVER append a second
+        genesis onto an unreadable log.
+        """
+        valid_bytes = 0
+        try:
+            with self.path.open("rb") as fh:
+                for raw in fh:
+                    try:
+                        line = json.loads(raw)
+                    except ValueError:  # JSONDecodeError or UnicodeDecodeError
+                        break  # torn tail starts here
+                    self._next_seq = int(line["seq"]) + 1
+                    self._prev = str(line["id"])
+                    valid_bytes += len(raw)
+        except OSError as exc:
+            _warn_once(f"resume::{type(exc).__name__}",
+                       f"existing log unreadable ({type(exc).__name__}); "
+                       "starting a fresh chain — investigate manually.")
+            return
+
+        size = self.path.stat().st_size
+        if self._next_seq == 0 and size > 0:
+            # not one valid line: quarantine, never glue a new chain to garbage
+            ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            quarantine = self.path.with_name(f"{self.path.stem}.corrupt-{ts}.jsonl")
+            self.path.rename(quarantine)
+            _warn_once(f"quarantine::{self.path}",
+                       f"existing log had no valid events; moved to {quarantine.name} "
+                       "and starting a fresh chain.")
+            return
+        if valid_bytes < size:
+            torn = size - valid_bytes
+            with self.path.open("r+b") as fh:
+                fh.truncate(valid_bytes)
+            _warn_once(f"torn-tail::{self.path}",
+                       f"truncated {torn} torn trailing bytes from {self.path.name} "
+                       "(crash mid-write?); chain resumes from the last valid event.")
 
     # -- writing ------------------------------------------------------------
 

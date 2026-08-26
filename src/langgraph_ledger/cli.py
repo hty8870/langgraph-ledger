@@ -18,14 +18,14 @@ from .analysis import analyze_log
 from .dag import build_dag_from_file
 from .repair import close_orphaned_run, repair_all
 from .replay import replay_messages
-from .verify import verify_log
+from .verify import chain_head, verify_log
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="langgraph_ledger",
                                      description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("verify", "analyze", "dag", "replay"):
+    for name in ("verify", "analyze", "dag", "replay", "head"):
         p = sub.add_parser(name)
         p.add_argument("log", help="path to a thread .jsonl trace log")
         if name == "dag":
@@ -61,6 +61,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "replay":
         print(json.dumps(replay_messages(args.log), ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "head":
+        print(json.dumps(chain_head(args.log), ensure_ascii=False))
         return 0
     dag = build_dag_from_file(args.log)
     print(dag.to_mermaid() if args.mermaid else json.dumps(dag.to_dict(), ensure_ascii=False, indent=2))
