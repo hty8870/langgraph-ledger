@@ -104,13 +104,20 @@ class TraceRecorder:
 
     ``seq`` and the hash chain resume from the existing file when reopening,
     so a continued thread never renumbers and never forks the chain.
+
+    ``strict=True`` flips the observer discipline from fail-soft to
+    fail-closed: :meth:`emit` raises on any failure. Use it when the invariant
+    "model-visible ⟺ recorded" must be *enforced*, not merely attempted —
+    a run that cannot record must not proceed.
     """
 
     def __init__(self, root: str | Path, thread_id: str,
-                 *, enabled: bool = True, version: int = FORMAT_VERSION) -> None:
+                 *, enabled: bool = True, strict: bool = False,
+                 version: int = FORMAT_VERSION) -> None:
         self.root = Path(root)
         self.thread_id = str(thread_id or "anonymous")
         self.enabled = bool(enabled)
+        self.strict = bool(strict)
         self.version = int(version)
         self.path = self.root / f"{_safe_segment(self.thread_id)}.jsonl"
         self._lock = _lock_for(self.path)
@@ -143,13 +150,19 @@ class TraceRecorder:
         return envelope
 
     def emit(self, kind: str, payload: Any) -> bool:
-        """Fail-soft append for the hot path. Never raises; returns persisted?."""
+        """Append for the hot path. Fail-soft by default (never raises, returns
+        persisted?); in ``strict`` mode failures raise instead — a run that
+        cannot record must not proceed."""
         if not self.enabled:
+            if self.strict:
+                raise TracePayloadError("strict recorder is disabled but emit was called")
             return False
         try:
             self.append(kind, payload)
             return True
         except Exception as exc:  # noqa: BLE001 — observer faults are dropped, logged once
+            if self.strict:
+                raise
             self.dropped += 1
             _warn_once(f"emit::{type(exc).__name__}",
                        f"trace event dropped ({type(exc).__name__}); log may be incomplete.")
@@ -211,14 +224,14 @@ _RECORDERS: dict[str, "TraceRecorder"] = {}
 
 
 def recorder_for(root: str | Path, thread_id: str, *,
-                 enabled: bool = True) -> "TraceRecorder":
+                 enabled: bool = True, strict: bool = False) -> "TraceRecorder":
     """The one recorder per (root, thread) — cached by path. The first call's
-    `enabled` wins; later calls get the same instance regardless."""
+    `enabled`/`strict` win; later calls get the same instance regardless."""
     key = str(Path(root) / f"{_safe_segment(thread_id)}.jsonl")
     with _PATH_LOCKS_GUARD:
         rec = _RECORDERS.get(key)
         if rec is None:
-            rec = TraceRecorder(root, thread_id, enabled=enabled)
+            rec = TraceRecorder(root, thread_id, enabled=enabled, strict=strict)
             _RECORDERS[key] = rec
         return rec
 

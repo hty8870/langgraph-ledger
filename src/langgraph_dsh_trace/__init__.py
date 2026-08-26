@@ -12,10 +12,12 @@ from .hashing import (canonical_json, checkpoint_label, event_id, sha256_hex,
 from .recorder import (TracePayloadError, TraceRecorder, active_recorder,
                        bind_recorder, current_recorder, emit_event, read_log,
                        recorder_for)
+from .repair import close_orphaned_run, find_orphaned_runs, repair_all
+from .replay import ReplayError, replay_messages
 from .rollback import find_checkpoint_by_label, fork_thread, time_travel_config
 from .verify import VerifyReport, verify_log, verify_thread
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "__version__",
@@ -31,4 +33,7 @@ __all__ = [
     "RunDAG", "build_dag", "build_dag_from_file",
     "fork_thread", "time_travel_config", "find_checkpoint_by_label",
     "verify_log", "verify_thread", "VerifyReport", "analyze_log",
+    # crash recovery / replay
+    "find_orphaned_runs", "close_orphaned_run", "repair_all",
+    "replay_messages", "ReplayError",
 ]

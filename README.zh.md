@@ -80,6 +80,8 @@ new_tid = fork_thread(saver, "run-42", at_checkpoint_id="<past-id>")
 python -m langgraph_dsh_trace verify  traces/run-42.jsonl   # 哈希链完好？
 python -m langgraph_dsh_trace analyze traces/run-42.jsonl   # 错误、循环、时间线
 python -m langgraph_dsh_trace dag     traces/run-42.jsonl --mermaid
+python -m langgraph_dsh_trace repair  traces/               # 闭合崩溃遗留的未完结 run
+python -m langgraph_dsh_trace replay  traces/run-42.jsonl   # 从日志重建消息时间线
 ```
 
 ```python
@@ -87,6 +89,14 @@ from langgraph_dsh_trace import verify_thread
 report = verify_thread(saver, "traces/run-42.jsonl")  # 存储态 == 日志声明？
 assert report["ok"]
 ```
+
+### 崩溃恢复与回放
+
+进程在 run 中途死掉时，日志末尾留下未闭合的 `run/start`。`verify` 会如实报
+*open run*；`repair` 通过哈希链追加一条诚实的 `run/end {status: "interrupted"}`
+（幂等、不改写历史）。`replay_messages()` 从日志重建对话时间线——默认只给
+digest，handler 以 `record_full=True` 创建时给全文。若需要 fail-closed（记录
+不下来就不允许 run 继续），用 `TraceRecorder(..., strict=True)`。
 
 ## 与 DeepSeek Harness 的设计映射
 
@@ -99,10 +109,12 @@ assert report["ok"]
 | turn / step 层级 | `run/*` / `node/*` 事件 |
 | `parentSession` + `seedLength` 分叉谱系 | `fork` 事件载荷 |
 | `sourceEventSeqs` 溯源 | DAG 边：链、调用→结果、快照→父快照 |
-| Model-Visible ⟺ Logged 不变量 | 载荷 digest（sha256 + 首 80 字）——可审计且不落全文 |
+| Model-Visible ⟺ Logged 不变量 | 载荷 digest（sha256 + 首 80 字）；`strict=True` 强制 fail-closed |
+| 崩溃孤儿 turn 在重载时闭合为 `interrupted` | `repair`——经哈希链追加 `run/end {status: interrupted}` |
+| `deriveMessages`（日志 → 对话） | `replay_messages`——digest 或全文（`record_full=True`） |
 | fail-closed 不变量 | 追加处严格 JSON 校验；`verify_*` 发现不符即拒绝 |
 
-有意偏离：prompt/response 全文默认**不落盘**（只存 digest，调用侧可 opt-in）；dsh 的字节级流回放与上下文压缩不在范围内。
+有意偏离：prompt/response 全文默认**不落盘**（只存 digest，`record_full=True` 可 opt-in）；dsh 的字节级流回放与上下文压缩不在范围内。
 
 ## 它不是什么
 

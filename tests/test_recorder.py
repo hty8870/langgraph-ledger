@@ -13,6 +13,7 @@ def test_append_writes_hash_chained_envelopes(tmp_path):
     rec = TraceRecorder(tmp_path, "t1")
     e0 = rec.append("run/start", {"graph": "g"})
     e1 = rec.append("node/start", {"node": "n1", "run_id": "r"})
+    rec.append("run/end", {"status": "completed"})
     assert e0["seq"] == 0 and e1["seq"] == 1
     assert e1["prev"] == e0["id"]
     assert verify_log(rec.path)

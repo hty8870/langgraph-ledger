@@ -82,6 +82,8 @@ new_tid = fork_thread(saver, "run-42", at_checkpoint_id="<past-id>")
 python -m langgraph_dsh_trace verify  traces/run-42.jsonl   # hash chain intact?
 python -m langgraph_dsh_trace analyze traces/run-42.jsonl   # errors, loops, timeline
 python -m langgraph_dsh_trace dag     traces/run-42.jsonl --mermaid
+python -m langgraph_dsh_trace repair  traces/               # close crash-orphaned runs
+python -m langgraph_dsh_trace replay  traces/run-42.jsonl   # rebuild the message timeline
 ```
 
 ```python
@@ -89,6 +91,16 @@ from langgraph_dsh_trace import verify_thread
 report = verify_thread(saver, "traces/run-42.jsonl")  # stored state == logged claim?
 assert report["ok"]
 ```
+
+### Crash recovery & replay
+
+If the process dies mid-run, the log ends with an unclosed `run/start`.
+`verify` flags it as an *open run*; `repair` appends an honest
+`run/end {status: "interrupted"}` through the hash chain (idempotent, never
+rewrites history). `replay_messages()` rebuilds the conversation timeline from
+the log — digests by default, full text when the handler was created with
+`record_full=True`. For fail-closed operation (a run that cannot record must
+not proceed), use `TraceRecorder(..., strict=True)`.
 
 ## Design mapping from DeepSeek Harness
 
@@ -101,10 +113,12 @@ A design study, not a port of code (dsh is TypeScript/Node; this is Python/LangG
 | turn / step hierarchy | `run/*` / `node/*` events |
 | `parentSession` + `seedLength` fork lineage | `fork` event payload |
 | `sourceEventSeqs` provenance | DAG edges: chain, call→result, snapshot→parent |
-| Model-Visible ⟺ Logged invariant | payload digests (sha256 + head) — auditable without storing full text |
+| Model-Visible ⟺ Logged invariant | payload digests (sha256 + head); `strict=True` enforces fail-closed recording |
+| crash-orphaned turns closed as `interrupted` on reload | `repair` — appends `run/end {status: interrupted}` through the hash chain |
+| `deriveMessages` (log → conversation) | `replay_messages` — digests or full text (`record_full=True`) |
 | fail-closed invariants | append-time strict JSON validation; `verify_*` refuse on mismatch |
 
-Deliberate deviations: prompt/response full text is **not** stored by default (digest only, opt-in at call site); dsh's byte-level replay and compaction are out of scope.
+Deliberate deviations: prompt/response full text is **not** stored by default (digest only, opt-in via `record_full=True`); dsh's byte-level replay and compaction are out of scope.
 
 ## What it is NOT
 

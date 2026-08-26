@@ -42,13 +42,19 @@ class VerifyReport(dict):
 
 
 def verify_log(path: str | Path) -> VerifyReport:
-    """Re-verify one JSONL log file. Returns a report dict (truthy when ok)."""
+    """Re-verify one JSONL log file. Returns a report dict (truthy when ok).
+
+    Checks: hash chain (seq/prev/id), format version, and run bracket pairing
+    (an unclosed ``run/start`` means the process died mid-run — the log is
+    honest but incomplete; repair it with :mod:`langgraph_dsh_trace.repair`).
+    """
     errors: list[dict[str, Any]] = []
     events = 0
     unknown_kinds: dict[str, int] = {}
     expected_seq = 0
     expected_prev = GENESIS_PREV
     version: int | None = None
+    run_open_at: int | None = None
 
     try:
         lines = list(read_log(path))
@@ -63,6 +69,14 @@ def verify_log(path: str | Path) -> VerifyReport:
             unknown_kinds[kind] = unknown_kinds.get(kind, 0) + 1  # forward-compat: count, don't reject
         if version is None:
             version = e.get("v")
+        if e.get("v") != ev.FORMAT_VERSION:
+            errors.append({"seq": seq,
+                           "error": f"unknown format version {e.get('v')!r} "
+                                    f"(supported: {ev.FORMAT_VERSION})"})
+        if kind == ev.KIND_RUN_START:
+            run_open_at = seq
+        elif kind == ev.KIND_RUN_END:
+            run_open_at = None
         if seq != expected_seq:
             errors.append({"seq": seq, "error": f"seq gap: expected {expected_seq}"})
         if e.get("prev") != expected_prev:
@@ -76,8 +90,15 @@ def verify_log(path: str | Path) -> VerifyReport:
         expected_prev = str(e.get("id") or "")
         events += 1
 
+    open_run = run_open_at is not None
+    if open_run:
+        errors.append({"seq": run_open_at,
+                       "error": "open run: run/start without run/end "
+                                "(crashed mid-run? close it with repair)"})
+
     return VerifyReport(ok=not errors, events=events, version=version,
-                        errors=errors, unknown_kinds=unknown_kinds)
+                        open_run=open_run, errors=errors,
+                        unknown_kinds=unknown_kinds)
 
 
 def verify_thread(saver: BaseCheckpointSaver, path: str | Path,

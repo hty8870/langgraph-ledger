@@ -25,6 +25,9 @@ def analyze_log(path: str | Path) -> dict[str, Any]:
     errors: list[dict[str, Any]] = []
     tool_labels: dict[str, dict[str, Any]] = {}
     checkpoints = 0
+    interrupted_runs = 0
+    models: dict[str, int] = {}
+    node_ms: dict[str, int] = {}
     first_ts: str | None = None
     last_ts: str | None = None
     unknown: dict[str, int] = {}
@@ -68,9 +71,17 @@ def analyze_log(path: str | Path) -> dict[str, Any]:
         elif kind == ev.KIND_LLM_CALL and payload.get("error"):
             errors.append({"seq": seq, "kind": kind, "node": payload.get("node"),
                            "error": payload.get("error")})
+        if kind == ev.KIND_LLM_CALL and payload.get("model"):
+            m = str(payload["model"])
+            models[m] = models.get(m, 0) + 1
         elif kind == ev.KIND_NODE_END and not payload.get("ok", True):
             errors.append({"seq": seq, "kind": kind, "run_id": payload.get("run_id"),
                            "error": payload.get("error")})
+        if kind == ev.KIND_NODE_END and payload.get("node"):
+            node = str(payload["node"])
+            node_ms[node] = node_ms.get(node, 0) + int(payload.get("ms") or 0)
+        elif kind == ev.KIND_RUN_END and payload.get("status") == "interrupted":
+            interrupted_runs += 1
         elif kind == ev.KIND_ERROR:
             errors.append({"seq": seq, "kind": kind, "where": payload.get("where"),
                            "error": payload.get("error")})
@@ -90,6 +101,9 @@ def analyze_log(path: str | Path) -> dict[str, Any]:
         "by_kind": by_kind,
         "unknown_kinds": unknown,
         "checkpoints": checkpoints,
+        "interrupted_runs": interrupted_runs,
+        "models": models,
+        "node_time_ms": node_ms,
         "errors": errors,
         "error_count": len(errors),
         "repeated_tool_calls": loops,

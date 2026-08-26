@@ -11,8 +11,8 @@ from langgraph.graph import END, START, StateGraph
 
 from langgraph_dsh_trace import (DshTraceCallbackHandler, TraceRecorder,
                                  TracingCheckpointSaver, analyze_log,
-                                 build_dag, fork_thread, time_travel_config,
-                                 verify_log, verify_thread)
+                                 build_dag, fork_thread, read_log,
+                                 time_travel_config, verify_log, verify_thread)
 
 
 class State(TypedDict):
@@ -46,12 +46,12 @@ def main() -> None:
     report = analyze_log(log)
     print("checkpoints  :", report["checkpoints"], "| errors:", report["error_count"])
 
-    dag = build_dag(list(__import__("langgraph_dsh_trace").read_log(log)))
+    dag = build_dag(list(read_log(log)))
     print("\n--- DAG (mermaid) ---\n" + dag.to_mermaid())
 
     # time travel: fork the thread's future from the first checkpoint
     first_cp = next(e["payload"]["checkpoint_id"]
-                    for e in __import__("langgraph_dsh_trace").read_log(log)
+                    for e in read_log(log)
                     if e["kind"] == "state/snapshot")
     tt = time_travel_config("demo", first_cp)
     new_cfg = app.update_state(tt, {"count": 999})
