@@ -1,8 +1,17 @@
 # langgraph-ledger
 
+[![PyPI](https://img.shields.io/pypi/v/langgraph-ledger)](https://pypi.org/project/langgraph-ledger/)
+[![CI](https://github.com/hty8870/langgraph-ledger/actions/workflows/ci.yml/badge.svg)](https://github.com/hty8870/langgraph-ledger/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/pypi/pyversions/langgraph-ledger)](https://pypi.org/project/langgraph-ledger/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **Full, tamper-evident traceability for LangGraph agents** — a port of DeepSeek Harness (dsh)'s traceability design: content-addressed labels on every tool call, a hash-chained append-only event ledger, the execution DAG, replay, crash recovery, and first-class fork/rollback.
 
 [English](README.md) · [中文](README.zh.md)
+
+```bash
+pip install langgraph-ledger
+```
 
 ## Why
 

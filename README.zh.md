@@ -1,6 +1,15 @@
 # langgraph-ledger
 
+[![PyPI](https://img.shields.io/pypi/v/langgraph-ledger)](https://pypi.org/project/langgraph-ledger/)
+[![CI](https://github.com/hty8870/langgraph-ledger/actions/workflows/ci.yml/badge.svg)](https://github.com/hty8870/langgraph-ledger/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/pypi/pyversions/langgraph-ledger)](https://pypi.org/project/langgraph-ledger/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **面向 LangGraph agent 的全量、防篡改可回溯性** —— 移植 DeepSeek Harness（dsh）的可回溯性设计：每个 tool call 的内容寻址哈希标签、仅追加的哈希链事件账本、执行 DAG、崩溃恢复与回放，以及一等公民的 fork/回退。服务于操作的完整可回退、高度可审计与故障分析。
+
+```bash
+pip install langgraph-ledger
+```
 
 [English](README.md) · [中文](README.zh.md)
 
