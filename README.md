@@ -129,6 +129,16 @@ A design study, not a port of code (dsh is TypeScript/Node; this is Python/LangG
 
 Deliberate deviations: prompt/response full text is **not** stored by default (digest only, opt-in via `record_full=True`); dsh's byte-level replay and compaction are out of scope.
 
+## Proven in production
+
+Before extraction, this design was battle-tested inside a production LangGraph agent product (private, Aug 2026) — a multi-round, tool-calling, real-model workload:
+
+- **Tracing overhead measured <0.1% of a turn** — microsecond-level append+flush per event vs. hundreds of ms per LLM round-trip. "ON by default" was justified by measurement, not hope.
+- **10 hook points wired with zero signature changes** to existing code (contextvars propagation); with tracing OFF, behavior is bit-identical — pinned by tests.
+- **Snapshot/rollback drill passed end-to-end**: file-level preimages, fail-closed on missing preimage (refuses rather than destroys), idempotent re-application.
+- **3,150-test suite green** after wiring the full hook surface.
+- The trace layer was how failures were *audited*: one reviewed failure class went from **17/17 of cases to 0** after the trace made its mechanism visible; routing dead-ends went **2 → 0**. (The latency cost of that refactor came from extra model rounds, not from tracing — the ledger itself stayed under 0.1%.)
+
 ## What it is NOT
 
 - Not a hosted observability platform — the log is a local file you own.
