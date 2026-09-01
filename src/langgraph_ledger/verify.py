@@ -59,12 +59,17 @@ class VerifyReport(dict):
         return bool(self.get("ok"))
 
 
-def verify_log(path: str | Path) -> VerifyReport:
+def verify_log(path: str | Path, *, hmac_key: bytes | str | None = None) -> VerifyReport:
     """Re-verify one JSONL log file. Returns a report dict (truthy when ok).
 
     Checks: hash chain (seq/prev/id), format version, and run bracket pairing
     (an unclosed ``run/start`` means the process died mid-run — the log is
     honest but incomplete; repair it with :mod:`langgraph_ledger.repair`).
+
+    ``hmac_key`` must match the key the log was written with. A keyed log
+    verified without its key fails closed (every id mismatches) — and vice
+    versa. Key discipline is the caller's; the report hints when a mismatch
+    pattern looks like a wrong/missing key rather than tampering.
     """
     errors: list[dict[str, Any]] = []
     events = 0
@@ -73,6 +78,7 @@ def verify_log(path: str | Path) -> VerifyReport:
     expected_prev = GENESIS_PREV
     version: int | None = None
     run_open_at: int | None = None
+    first_id_mismatch_at: int | None = None
 
     try:
         lines = list(read_log(path))
@@ -101,12 +107,21 @@ def verify_log(path: str | Path) -> VerifyReport:
             errors.append({"seq": seq, "error": "prev link broken (deletion/reorder/edit?)"})
         recomputed = event_id(version=e.get("v", 0), seq=e.get("seq", -1),
                               ts=e.get("ts", ""), kind=kind,
-                              payload=e.get("payload"), prev=e.get("prev", ""))
+                              payload=e.get("payload"), prev=e.get("prev", ""),
+                              key=hmac_key)
         if recomputed != e.get("id"):
+            if first_id_mismatch_at is None:
+                first_id_mismatch_at = seq
             errors.append({"seq": seq, "error": "id mismatch: content was modified"})
         expected_seq = (seq or 0) + 1
         expected_prev = str(e.get("id") or "")
         events += 1
+
+    if first_id_mismatch_at == 0 and events > 0:
+        errors.append({"seq": 0,
+                       "error": "every id mismatches from genesis — wrong or "
+                                "missing HMAC key? (keyed logs need the key; "
+                                "keyless logs must be verified without one)"})
 
     open_run = run_open_at is not None
     if open_run:

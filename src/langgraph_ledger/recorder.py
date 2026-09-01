@@ -83,14 +83,15 @@ class TracePayloadError(ValueError):
 
 
 def _checked_envelope(version: int, seq: int, ts: str, kind: str,
-                      payload: Any, prev: str) -> dict[str, Any]:
+                      payload: Any, prev: str,
+                      hmac_key: bytes | str | None = None) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise TracePayloadError(f"payload must be a dict, got {type(payload).__name__}")
     if not kind or not str(kind).strip():
         raise TracePayloadError("kind must be non-empty")
     try:
         eid = event_id(version=version, seq=seq, ts=ts, kind=kind,
-                       payload=payload, prev=prev)
+                       payload=payload, prev=prev, key=hmac_key)
         envelope = {"v": int(version), "seq": int(seq), "ts": ts, "kind": str(kind),
                     "payload": payload, "id": eid, "prev": str(prev)}
         json.dumps(envelope, ensure_ascii=False, allow_nan=False)
@@ -109,16 +110,23 @@ class TraceRecorder:
     fail-closed: :meth:`emit` raises on any failure. Use it when the invariant
     "model-visible ⟺ recorded" must be *enforced*, not merely attempted —
     a run that cannot record must not proceed.
+
+    ``hmac_key`` keys the hash chain (HMAC-SHA256): without the key an
+    attacker cannot re-chain even a full-file rewrite. Mixing keyed appends
+    into a keyless log (or vice versa) just produces a broken chain — the
+    caller owns key discipline; verify with the same key.
     """
 
     def __init__(self, root: str | Path, thread_id: str,
                  *, enabled: bool = True, strict: bool = False,
-                 version: int = FORMAT_VERSION) -> None:
+                 version: int = FORMAT_VERSION,
+                 hmac_key: bytes | str | None = None) -> None:
         self.root = Path(root)
         self.thread_id = str(thread_id or "anonymous")
         self.enabled = bool(enabled)
         self.strict = bool(strict)
         self.version = int(version)
+        self._hmac_key = hmac_key
         self.path = self.root / f"{_safe_segment(self.thread_id)}.jsonl"
         self._lock = _lock_for(self.path)
         self.dropped = 0
@@ -177,7 +185,8 @@ class TraceRecorder:
         """Strict append: bad payload or write failure raises."""
         with self._lock:
             envelope = _checked_envelope(self.version, self._next_seq,
-                                         _now_iso(), kind, payload, self._prev)
+                                         _now_iso(), kind, payload, self._prev,
+                                         hmac_key=self._hmac_key)
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(envelope, ensure_ascii=False, allow_nan=False) + "\n")
@@ -261,14 +270,17 @@ _RECORDERS: dict[str, "TraceRecorder"] = {}
 
 
 def recorder_for(root: str | Path, thread_id: str, *,
-                 enabled: bool = True, strict: bool = False) -> "TraceRecorder":
+                 enabled: bool = True, strict: bool = False,
+                 hmac_key: bytes | str | None = None) -> "TraceRecorder":
     """The one recorder per (root, thread) — cached by path. The first call's
-    `enabled`/`strict` win; later calls get the same instance regardless."""
+    `enabled`/`strict`/`hmac_key` win; later calls get the same instance
+    regardless."""
     key = str(Path(root) / f"{_safe_segment(thread_id)}.jsonl")
     with _PATH_LOCKS_GUARD:
         rec = _RECORDERS.get(key)
         if rec is None:
-            rec = TraceRecorder(root, thread_id, enabled=enabled, strict=strict)
+            rec = TraceRecorder(root, thread_id, enabled=enabled, strict=strict,
+                                hmac_key=hmac_key)
             _RECORDERS[key] = rec
         return rec
 

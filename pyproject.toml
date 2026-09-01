@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "langgraph-ledger"
-version = "0.2.1"
+version = "0.3.0"
 description = "Full, tamper-evident traceability for LangGraph agents — a port of DeepSeek Harness (dsh)'s traceability design: hash-chained, content-addressed, replayable, rewindable."
 readme = "README.md"
 requires-python = ">=3.10"

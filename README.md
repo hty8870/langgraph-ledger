@@ -142,13 +142,24 @@ Before extraction, this design was battle-tested inside a production LangGraph a
 - The trace layer was how failures were *audited*: one reviewed failure class went from **17/17 of cases to 0** after the trace made its mechanism visible; routing dead-ends went **2 → 0**. (The latency cost of that refactor came from extra model rounds, not from tracing — the ledger itself stayed under 0.1%.)
 
 ## Threat model (read before you rely on "tamper-evident")
+The hash chain is **keyless by default** — and since 0.3.0, optionally **keyed**:
 
-The hash chain is **keyless** — this is a design choice, and it has a precise meaning:
+- ✅ **Proven (keyless)**: given a trusted chain head, ANY deletion, reordering, or edit of ANY logged line is detectable (`verify` recomputes the full chain).
+- ❌ **Not proven (keyless)**: an attacker with write access to the log file who rewrites the *entire* file and re-chains it from genesis. No secret is involved, so nothing stops a full rewrite.
+- 🔑 **Keyed mode (HMAC-SHA256)**: pass `hmac_key=` to `TraceRecorder` / `recorder_for`, and the chain cannot be re-chained without the key — the full-rewrite attack fails even against an attacker who controls the file. Keep the key out of the log's trust domain (env var, secrets manager); losing the key means losing the ability to verify.
 
-- ✅ **Proven**: given a trusted chain head, ANY deletion, reordering, or edit of ANY logged line is detectable (`verify` recomputes the full chain).
-- ❌ **Not proven**: an attacker with write access to the log file who rewrites the *entire* file and re-chains it from genesis. No secret is involved, so nothing stops a full rewrite.
+```python
+TraceRecorder("traces", thread_id, hmac_key=os.environ["LEDGER_HMAC_KEY"])
+```
 
-**Therefore: anchor the head outside the log's trust domain.** Export it after each run and store it somewhere the process cannot write:
+```bash
+export LANGGRAPH_LEDGER_HMAC_KEY=...          # never pass keys as CLI args
+python -m langgraph_ledger verify traces/run-42.jsonl
+```
+
+Keyed mode is fully backward compatible: keyless logs verify exactly as before (just don't pass a key), and content labels (`tl_*`, `cp_*`, payload digests) stay keyless so cross-log dedup and loop detection keep working without any secret.
+
+**Whether keyed or not: anchor the head outside the log's trust domain.** Export it after each run and store it somewhere the process cannot write:
 
 ```bash
 python -m langgraph_ledger head traces/run-42.jsonl   # {"seq": N, "id": "<hex>"}

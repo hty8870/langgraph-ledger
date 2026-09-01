@@ -1,16 +1,21 @@
 # -*- coding: utf-8 -*-
 """CLI: verify / analyze / dag / repair / replay a recorded trace log.
 
-    python -m langgraph_ledger verify  <thread.jsonl>
+    python -m langgraph_ledger verify  <thread.jsonl> [--hmac-key-env NAME]
     python -m langgraph_ledger analyze <thread.jsonl>
     python -m langgraph_ledger dag     <thread.jsonl> [--mermaid]
     python -m langgraph_ledger repair  <thread.jsonl | trace-root/>
     python -m langgraph_ledger replay  <thread.jsonl>
+
+Keyed (HMAC) logs are verified by passing the key via an environment
+variable — never as a CLI argument (command lines land in shell history).
+Default variable: LANGGRAPH_LEDGER_HMAC_KEY.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -31,6 +36,10 @@ def main(argv: list[str] | None = None) -> int:
         if name == "dag":
             p.add_argument("--mermaid", action="store_true",
                            help="print a Mermaid flowchart instead of JSON")
+        if name == "verify":
+            p.add_argument("--hmac-key-env", default="LANGGRAPH_LEDGER_HMAC_KEY",
+                           metavar="NAME", help="env var holding the HMAC key "
+                           "(default: LANGGRAPH_LEDGER_HMAC_KEY)")
     p = sub.add_parser("repair", help="close crash-orphaned runs "
                        "(a single log or a whole trace-root directory)")
     p.add_argument("target", help="a thread .jsonl log or a trace-root directory")
@@ -53,7 +62,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.command == "verify":
-        report = verify_log(args.log)
+        hmac_key = os.environ.get(args.hmac_key_env) or None
+        report = verify_log(args.log, hmac_key=hmac_key)
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0 if report else 1
     if args.command == "analyze":

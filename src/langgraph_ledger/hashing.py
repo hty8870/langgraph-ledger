@@ -8,14 +8,21 @@ loop detection, dedup and tamper evidence possible.
 
 Label formats:
 - Event id (hash chain): ``sha256`` over the full canonical envelope including
-  the previous event id — tamper-evident ordering (a merkle chain).
+  the previous event id — tamper-evident ordering (a merkle chain). With an
+  ``hmac_key`` the chain becomes *keyed* (HMAC-SHA256): an attacker who can
+  rewrite the whole file can no longer re-chain it without the key.
 - Tool-call label: ``tl_<hex16>`` over ``{name, input}`` only — identical
   calls share a label regardless of when they happen (loop/dedup signal).
 - Checkpoint label: ``cp_<hex16>`` over the serialized checkpoint bytes.
+
+Only the *chain id* accepts a key. Content labels stay keyless on purpose:
+they power cross-log dedup and loop detection, which must work without any
+secret (and carry no integrity claim — the chain is the integrity layer).
 """
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 from typing import Any
 
@@ -54,19 +61,40 @@ def _fallback(value: Any) -> Any:
     return {"__repr__": repr(value)}
 
 
-def sha256_hex(data: str | bytes) -> str:
+def _key_bytes(key: bytes | str | None) -> bytes | None:
+    """Normalize an HMAC key: str is UTF-8 encoded; None stays None."""
+    if key is None:
+        return None
+    if isinstance(key, str):
+        key = key.encode("utf-8")
+    if not key:
+        raise ValueError("hmac_key must be non-empty")
+    return key
+
+
+def sha256_hex(data: str | bytes, *, key: bytes | str | None = None) -> str:
+    """Content hash. With ``key``, HMAC-SHA256 instead of plain SHA-256."""
     if isinstance(data, str):
         data = data.encode("utf-8")
+    k = _key_bytes(key)
+    if k is not None:
+        return hmac.new(k, data, hashlib.sha256).hexdigest()
     return hashlib.sha256(data).hexdigest()
 
 
 def event_id(*, version: int, seq: int, ts: str, kind: str,
-             payload: dict, prev: str) -> str:
-    """Hash-chain identity of one event: binds content AND position AND history."""
+             payload: dict, prev: str, key: bytes | str | None = None) -> str:
+    """Hash-chain identity of one event: binds content AND position AND history.
+
+    ``key`` switches the chain from keyless (detect edits given a trusted
+    head) to keyed (an attacker cannot re-chain even a full rewrite without
+    the key). Both directions of a mismatch fail closed: a keyed log verified
+    without the key fails, and vice versa.
+    """
     return sha256_hex(canonical_json({
         "v": int(version), "seq": int(seq), "ts": str(ts),
         "kind": str(kind), "payload": payload, "prev": str(prev),
-    }))
+    }), key=key)
 
 
 def tool_call_label(name: Any, tool_input: Any) -> str:

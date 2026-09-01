@@ -3,6 +3,30 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.3.0] - 2026-09-01
+
+Keyed chains: the full-rewrite attack from the threat model now has a
+cryptographic countermeasure.
+
+### Added
+- **Optional HMAC-SHA256 keyed hash chain** — `TraceRecorder` / `recorder_for`
+  accept `hmac_key=`, `verify_log(path, hmac_key=...)` verifies keyed logs, and
+  the CLI reads the key from an env var (`LANGGRAPH_LEDGER_HMAC_KEY` by default;
+  `--hmac-key-env NAME` to choose another). Without the key, an attacker can no
+  longer rewrite the whole file and re-chain it — the attack the keyless threat
+  model had to delegate to external anchoring.
+- Key-mismatch hint in verify reports: when every id mismatches from genesis,
+  the report says "wrong or missing HMAC key?" instead of looking like wholesale
+  tampering.
+
+### Notes
+- Fully backward compatible: keyless logs verify exactly as before; content
+  labels (`tl_*`, `cp_*`, payload digests) stay keyless so dedup and loop
+  detection keep working without any secret.
+- New adversarial test (`test_full_rechain_attack_defeats_keyless_but_not_keyed`)
+  demonstrates the attack succeeding against a keyless chain and failing
+  against a keyed one.
+
 ## [0.2.1] - 2026-08-26
 
 Hardening release driven by an adversarial self-review.
