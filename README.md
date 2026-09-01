@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/langgraph-ledger)](https://pypi.org/project/langgraph-ledger/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Full, tamper-evident traceability for LangGraph agents** — a port of DeepSeek Harness (dsh)'s traceability design: content-addressed labels on every tool call, a hash-chained append-only event ledger, the execution DAG, replay, crash recovery, and first-class fork/rollback.
+**Tamper-evident audit ledger for LangGraph agents** — hash-chained (optionally HMAC-keyed) event log, *state-level* checkpoint fingerprinting, replay, DAG lineage, and rollback. Inspired by DeepSeek Harness's append-only session discipline; adds the cryptographic integrity layer dsh itself does not have.
 
 [English](README.md) · [中文](README.zh.md)
 
@@ -15,34 +15,41 @@ pip install langgraph-ledger
 
 ## Why
 
-LangGraph already checkpoints state and can time-travel. What it does *not* give you is an **audit-grade record**: were these events edited after the fact? Which tool call exactly — same name, or same *content*? What did the run look like as a graph, and can I fork from any point of it?
+**Your agent's logs are not evidence.** Plain transcripts (a Claude Code / Codex session file, a LangSmith trace) are mutable text: edit a line, delete a line, and nothing downstream can tell. Fine for debugging — worthless in an audit, an incident review, or a dispute.
 
-This plugin ports the traceability design of [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) — append-only session log as the single source of truth, format versioning, fork lineage — onto LangGraph's checkpointer contract, and adds what neither has out of the box: **content hashing**.
+LangGraph already checkpoints state and can time-travel. What it does *not* give you is an **audit-grade record**: were these events edited after the fact? Which tool call exactly — same name, or same *content*? Does the stored checkpoint still match what the run actually produced? What did the run look like as a graph, and can I fork from any point of it?
+
+This plugin carries the append-only session discipline of [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) onto LangGraph's checkpointer contract — and adds the integrity layer **neither LangGraph nor dsh has**: cryptographic fingerprinting of the event stream *and* the stored state.
 
 The combination is the point:
 
 | Capability | Mechanism |
 |---|---|
 | Tool-call identity | content-addressed label `tl_<hash>` — same (name, input) ⇒ same label |
-| Tamper evidence | every event hash-chained to its predecessor (merkle-style) |
+| Tamper evidence | every event hash-chained to its predecessor (merkle-style); optional **HMAC-keyed** chain (0.3.0) so even a whole-file rewrite fails |
+| State accountability | `verify_thread` re-hashes every stored checkpoint against its logged claim — *state* drift is caught, not just log edits |
 | Execution structure | DAG over chain + call/result + checkpoint-parent edges |
 | Rollback | `time_travel_config` (native fork) and `fork_thread` (dsh-style seeded fork with lineage event) |
 | Failure analysis | error timeline, exact-repeat loop detection (falls out of the labels) |
 | Verification | `verify_log` re-checks the chain; `verify_thread` re-hashes stored checkpoints against logged claims |
 
-## Differentiation (as of 2026-08)
+**A correctness detail most tools miss:** serializers normalize (msgpack turns `tuple` into `list`), so hashing the in-memory object and re-hashing the reloaded object can disagree on an untouched log — false "tampered" alarms. We hash the **roundtrip-normalized** form (the exact bytes a future verifier can reproduce), so verification compares like with like. This is what makes the fingerprints usable as evidence instead of noise.
+
+## Differentiation (2026-09 refresh)
 
 Honest snapshot of the neighborhood — see [POSITIONING](docs/positioning.md) for details:
 
-| Project | Hash chain | Execution DAG | State rollback/fork | LangGraph-native |
-|---|---|---|---|---|
-| **langgraph-ledger** | ✅ | ✅ | ✅ | ✅ (checkpointer drop-in) |
-| LangSmith / Langfuse / AgentOps | ✗ (hosted observability) | trace view | ✗ | SDK |
-| CONTINUUM | ✅ | ✗ | crash recovery focus | ✗ (MCP server) |
-| burnout / VeritasAgent / memtrail | ✅ | ✗ | ✗ | partial |
-| langgraph checkpointers (redis/mysql/…) | ✗ | parent links only | time-travel only | ✅ |
+| Project | Hash chain | Keyed chain | State fingerprinting | Rollback/fork | Form |
+|---|---|---|---|---|---|
+| **langgraph-ledger** | ✅ | ✅ HMAC (0.3.0) | ✅ re-hashes stored checkpoints | ✅ | LangGraph-native library |
+| LangSmith / Langfuse / AgentOps | ✗ (hosted observability) | ✗ | ✗ | ✗ | SaaS |
+| agent-flight-recorder | ✅ | ✅ HMAC | ✗ (tool-call level) | ✗ | Claude Code skill pack |
+| Promptise | ✅ | ✅ HMAC | ✗ | ✗ | MCP middleware |
+| Probity / Zyvra | ✅ | ✅ signed | ✗ | ✗ | commercial compliance |
+| DeepSeek Harness (inspiration) | ✗ (zstd frame checksums) | ✗ | attachments only | fork lineage | TS/Node harness |
+| langgraph checkpointers | ✗ | ✗ | ✗ | time-travel only | ✅ |
 
-Nobody else ships hash-labels + DAG + rollback as one LangGraph-native unit. That is the slot this project occupies.
+The 2026 audit-tooling wave validates the need; the open slot this project occupies is narrower and deeper: **state-level fingerprinting + keyed chains + rollback, as one pip-installable LangGraph library** — no SaaS, no sidecar, your logs stay files you own.
 
 ## Install
 

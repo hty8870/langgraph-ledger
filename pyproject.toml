@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "langgraph-ledger"
 version = "0.3.0"
-description = "Full, tamper-evident traceability for LangGraph agents — a port of DeepSeek Harness (dsh)'s traceability design: hash-chained, content-addressed, replayable, rewindable."
+description = "Tamper-evident audit ledger for LangGraph agents — hash-chained (optionally HMAC-keyed) event log, state-level checkpoint fingerprinting, replay, DAG lineage, rollback. Inspired by DeepSeek Harness's append-only discipline."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-keywords = ["langgraph", "agent", "traceability", "audit", "hash-chain", "checkpoint", "rollback", "replay", "dsh", "deepseek-harness", "ledger", "agent-observability"]
+keywords = ["langgraph", "agent", "audit", "audit-log", "tamper-evident", "hash-chain", "merkle", "hmac", "checkpoint", "rollback", "replay", "event-sourcing", "dag", "ledger", "agent-observability", "llm-agents", "deepseek-harness", "dsh"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",

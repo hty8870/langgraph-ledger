@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/langgraph-ledger)](https://pypi.org/project/langgraph-ledger/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**面向 LangGraph agent 的全量、防篡改可回溯性** —— 移植 DeepSeek Harness（dsh）的可回溯性设计：每个 tool call 的内容寻址哈希标签、仅追加的哈希链事件账本、执行 DAG、崩溃恢复与回放，以及一等公民的 fork/回退。服务于操作的完整可回退、高度可审计与故障分析。
+**面向 LangGraph agent 的防篡改审计账本** —— 哈希链（可选 HMAC 带密钥）事件日志、**状态快照级**指纹、回放、DAG 血缘与回退。受 DeepSeek Harness 仅追加会话纪律的启发，并补上 dsh 自身没有的密码学完整性层。服务于操作的完整可回退、高度可审计与故障分析。
 
 ```bash
 pip install langgraph-ledger
@@ -15,32 +15,41 @@ pip install langgraph-ledger
 
 ## 为什么
 
-LangGraph 自带 checkpoint 和时间旅行，但它不给你的的是一份**审计级记录**：这些事件事后被改过吗？这次 tool call 到底是"同名"还是"同内容"？整次运行长成什么样的图，能不能从任意节点分叉？
+**你的 agent 日志不是证据。** 明文 transcript（Claude Code / Codex 的会话文件、LangSmith 的 trace）都是可改文本：改一行、删一行，下游无从察觉。调试用没问题——审计、故障复盘、纠纷举证时一文不值。
 
-本插件把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（dsh）的可回溯性设计——仅追加会话日志作为唯一真相源、格式版本、fork 谱系——移植到 LangGraph 的 checkpointer 契约上，并补上双方都没有原生提供的东西：**内容哈希**。
+LangGraph 自带 checkpoint 和时间旅行，但它不给你的是一份**审计级记录**：这些事件事后被改过吗？这次 tool call 到底是"同名"还是"同内容"？存着的 checkpoint 和当时跑出来的状态还一致吗？整次运行长成什么样的图，能不能从任意节点分叉？
+
+本插件把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（dsh）的仅追加会话纪律搬到 LangGraph 的 checkpointer 契约上，并补上 **LangGraph 和 dsh 都没有的**完整性层：对事件流**和**存储态的密码学指纹。
 
 价值在组合里：
 
 | 能力 | 机制 |
 |---|---|
 | tool call 身份 | 内容寻址标签 `tl_<hash>`：同（工具名, 入参）⇒ 同标签 |
-| 防篡改 | 每个事件与前驱哈希链锁（merkle 式） |
+| 防篡改 | 每个事件与前驱哈希链锁（merkle 式）；0.3.0 起可选 **HMAC 带密钥链**，整文件重写也无法接链 |
+| 状态对账 | `verify_thread` 重哈希每个存储的 checkpoint 对照日志声明——不止抓日志篡改，还抓**状态漂移** |
 | 执行结构 | 链边 + 调用/结果配对 + checkpoint 父子边构成的 DAG |
 | 回退 | `time_travel_config`（原生分叉）与 `fork_thread`（dsh 式带谱系事件的播种分叉） |
 | 故障分析 | 错误时间线、精确重复调用环检测（标签的免费副产品） |
 | 验证 | `verify_log` 重算哈希链；`verify_thread` 重哈希存储态对照日志声明 |
 
-## 差异化定位（2026-08 现状）
+**一个多数工具没做对的正确性细节**：序列化会归一化类型（msgpack 把 tuple 变成 list），对内存对象打哈希、再对读回的对象重打，什么都没动也会不一致——误报"被篡改"。我们对**往返归一化后的存储态**打指纹（即未来验证者唯一能重算出的那串字节），保证对账永远同口径。指纹因此能当证据用，而不是噪音。
 
-| 项目 | 哈希链 | 执行 DAG | 状态回退/分叉 | LangGraph 原生 |
-|---|---|---|---|---|
-| **langgraph-ledger** | ✅ | ✅ | ✅ | ✅（checkpointer 即插即用） |
-| LangSmith / Langfuse / AgentOps | ✗（托管观测） | trace 视图 | ✗ | SDK |
-| CONTINUUM | ✅ | ✗ | 聚焦崩溃恢复 | ✗（MCP server） |
-| burnout / VeritasAgent / memtrail | ✅ | ✗ | ✗ | 部分 |
-| langgraph 各 checkpointer | ✗ | 仅父链 | 仅时间旅行 | ✅ |
+## 差异化定位（2026-09 刷新）
 
-"哈希标签 + DAG + 可用于回退"三合一、LangGraph 原生——目前没人占这个位置。
+诚实记录竞争格局——详见 [POSITIONING](docs/positioning.md)：
+
+| 项目 | 哈希链 | 带密钥链 | 状态指纹 | 回退/分叉 | 形态 |
+|---|---|---|---|---|---|
+| **langgraph-ledger** | ✅ | ✅ HMAC（0.3.0） | ✅ 重哈希存储的 checkpoint | ✅ | LangGraph 原生库 |
+| LangSmith / Langfuse / AgentOps | ✗（托管观测） | ✗ | ✗ | ✗ | SaaS |
+| agent-flight-recorder | ✅ | ✅ HMAC | ✗（工具调用级） | ✗ | Claude Code skill 包 |
+| Promptise | ✅ | ✅ HMAC | ✗ | ✗ | MCP 中间件 |
+| Probity / Zyvra | ✅ | ✅ 签名 | ✗ | ✗ | 商业合规产品 |
+| DeepSeek Harness（灵感来源） | ✗（仅 zstd 帧 checksum） | ✗ | 仅附件 | fork 谱系 | TS/Node harness |
+| langgraph 各 checkpointer | ✗ | ✗ | ✗ | 仅时间旅行 | ✅ |
+
+2026 年的审计工具潮验证了需求；本项目占据的位置更窄更深：**状态级指纹 + 带密钥链 + 回退，一个 pip 可装的 LangGraph 库**——不要 SaaS、不要 sidecar，日志就是你自己的文件。
 
 ## 安装
 
