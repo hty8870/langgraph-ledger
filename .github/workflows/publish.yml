@@ -6,6 +6,7 @@ on:
   workflow_dispatch:   # manual fallback (e.g. first publish of an existing release)
 
 permissions:
+  contents: read       # checkout needs this now that the repo may be private
   id-token: write      # OIDC trusted publishing — no API token stored anywhere
 
 jobs:
